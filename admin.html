@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel - ModernShop</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body class="bg-gray-100 font-sans">
+
+    <nav class="bg-gray-900 text-white p-4 shadow-lg">
+        <div class="container mx-auto flex justify-between items-center">
+            <h1 class="text-xl font-bold">Admin ModernShop</h1>
+            <a href="index.html" class="text-sm bg-gray-700 px-4 py-2 rounded hover:bg-gray-600 transition">Lihat Toko</a>
+        </div>
+    </nav>
+
+    <div class="container mx-auto p-4 md:p-8">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            
+            <!-- FORM INPUT -->
+            <div class="lg:col-span-1">
+                <div class="bg-white p-6 rounded-xl shadow-md sticky top-24">
+                    <h2 id="form-title" class="text-xl font-bold mb-6">Tambah Produk Baru</h2>
+<form id="product-form" class="space-y-4">
+    <input type="hidden" id="edit-id">
+    <div>
+        <label for="prod-name" class="block text-sm font-medium text-gray-700">Nama Produk</label>
+        <input type="text" id="prod-name" name="prod-name" required class="w-full p-2 border rounded mt-1 focus:ring-2 focus:ring-blue-500 outline-none">
+    </div>
+    <div>
+        <label for="prod-price" class="block text-sm font-medium text-gray-700">Harga (Rp)</label>
+        <input type="number" id="prod-price" name="prod-price" required class="w-full p-2 border rounded mt-1 focus:ring-2 focus:ring-blue-500 outline-none">
+    </div>
+    <div>
+        <label for="prod-category" class="block text-sm font-medium text-gray-700">Kategori</label>
+        <select id="prod-category" name="prod-category" class="w-full p-2 border rounded mt-1 outline-none">
+            <option value="elektronik">Elektronik</option>
+            <option value="fashion">Fashion</option>
+            <option value="hobi">Hobi</option>
+        </select>
+    </div>
+    <div>
+        <label for="prod-image" class="block text-sm font-medium text-gray-700">URL Gambar (Unsplash/Link)</label>
+        <input type="url" id="prod-image" name="prod-image" required class="w-full p-2 border rounded mt-1 focus:ring-2 focus:ring-blue-500 outline-none">
+    </div>
+    <div class="flex gap-2 pt-4">
+        <button type="submit" id="btn-save" class="flex-1 bg-blue-600 text-white py-2 rounded font-bold hover:bg-blue-700 transition">Simpan Produk</button>
+        <button type="button" id="btn-cancel" onclick="resetForm()" class="hidden bg-gray-200 text-gray-700 px-4 py-2 rounded font-bold hover:bg-gray-300">Batal</button>
+    </div>
+</form>
+                </div>
+            </div>
+
+            <!-- TABEL DAFTAR PRODUK -->
+            <div class="lg:col-span-2">
+                <div class="bg-white rounded-xl shadow-md overflow-hidden">
+                    <div class="p-6 border-b">
+                        <h2 class="text-xl font-bold">Daftar Produk</h2>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="bg-gray-50 text-gray-600 text-sm">
+                                    <th class="p-4 border-b">Gambar</th>
+                                    <th class="p-4 border-b">Produk</th>
+                                    <th class="p-4 border-b">Harga</th>
+                                    <th class="p-4 border-b">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody id="admin-product-list">
+                                <!-- Data dari Firestore -->
+                            </tbody>
+                        </table>
+                    </div>
+                    <div id="loading" class="p-10 text-center text-gray-500">
+                        <i class="fas fa-spinner fa-spin mr-2"></i> Menghubungkan ke Cloud...
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script type="module">
+// admin.html & index.html
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js";
+import { getFirestore, collection, addDoc, onSnapshot, doc, deleteDoc, updateDoc } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
+// Tambahkan baris khusus AUTH di bawah ini:
+import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js";
+
+        // Firebase Configuration (Otomatis dari lingkungan)
+const firebaseConfig = {
+  apiKey: "AIzaSyBG4OyKr5caqPgpOzXLbMacuohKpPh8CEo",
+  authDomain: "tokomodernku.firebaseapp.com",
+  projectId: "tokomodernku",
+  storageBucket: "tokomodernku.firebasestorage.app",
+  messagingSenderId: "1062440325046",
+  appId: "1:1062440325046:web:d0af8b78493d4706c0fb17",
+  measurementId: "G-FD08S64CR2"
+};
+        
+// --- PERBAIKAN DI SINI ---
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const auth = getAuth(app); // Sekarang ini akan bekerja karena import sudah benar
+
+    const appId = 'tokomodernku-web'; // Definisikan appId secara manual
+    const colPath = `/artifacts/${appId}/public/data/products`; 
+    // -------------------------
+
+    // 1. Auth Dulu
+    signInAnonymously(auth).then(() => {
+        console.log("Terhubung sebagai tamu");
+        loadProducts();
+    }).catch(err => {
+        console.error("Gagal masuk:", err);
+    });
+
+        const form = document.getElementById('product-form');
+        const loading = document.getElementById('loading');
+
+        // 2. Tampilkan Data (Real-time)
+        function loadProducts() {
+            onSnapshot(collection(db, colPath), (snapshot) => {
+                loading.classList.add('hidden');
+                const list = document.getElementById('admin-product-list');
+                list.innerHTML = '';
+                
+                snapshot.forEach((docSnap) => {
+                    const p = docSnap.data();
+                    const id = docSnap.id;
+                    list.innerHTML += `
+                        <tr class="hover:bg-gray-50 border-b last:border-0 transition">
+                            <td class="p-4"><img src="${p.image}" class="w-12 h-12 object-cover rounded-md shadow-sm"></td>
+                            <td class="p-4">
+                                <div class="font-bold">${p.name}</div>
+                                <div class="text-xs text-blue-600 uppercase font-semibold">${p.category}</div>
+                            </td>
+                            <td class="p-4 text-gray-600">Rp ${Number(p.price).toLocaleString('id-ID')}</td>
+                            <td class="p-4 space-x-2">
+                                <button onclick="window.prepareEdit('${id}', '${p.name}', ${p.price}, '${p.category}', '${p.image}')" class="text-blue-500 hover:text-blue-700 p-2"><i class="fas fa-edit"></i></button>
+                                <button onclick="window.deleteProduct('${id}')" class="text-red-500 hover:text-red-700 p-2"><i class="fas fa-trash"></i></button>
+                            </td>
+                        </tr>
+                    `;
+                });
+            });
+        }
+
+        // 3. Simpan / Update Data
+        form.onsubmit = async (e) => {
+            e.preventDefault();
+            const id = document.getElementById('edit-id').value;
+            const data = {
+                name: document.getElementById('prod-name').value,
+                price: Number(document.getElementById('prod-price').value),
+                category: document.getElementById('prod-category').value,
+                image: document.getElementById('prod-image').value,
+                updatedAt: new Date().toISOString()
+            };
+
+            try {
+                if (id) {
+                    await updateDoc(doc(db, colPath, id), data);
+                } else {
+                    await addDoc(collection(db, colPath), data);
+                }
+                resetForm();
+            } catch (err) {
+                console.error("Error saving:", err);
+            }
+        };
+
+        // Global functions for buttons
+        window.deleteProduct = async (id) => {
+            if(confirm("Hapus produk ini?")) {
+                await deleteDoc(doc(db, colPath, id));
+            }
+        };
+
+        window.prepareEdit = (id, name, price, category, image) => {
+            document.getElementById('edit-id').value = id;
+            document.getElementById('prod-name').value = name;
+            document.getElementById('prod-price').value = price;
+            document.getElementById('prod-category').value = category;
+            document.getElementById('prod-image').value = image;
+            
+            document.getElementById('form-title').innerText = "Edit Produk";
+            document.getElementById('btn-save').innerText = "Update Produk";
+            document.getElementById('btn-cancel').classList.remove('hidden');
+        };
+
+        window.resetForm = () => {
+            form.reset();
+            document.getElementById('edit-id').value = '';
+            document.getElementById('form-title').innerText = "Tambah Produk Baru";
+            document.getElementById('btn-save').innerText = "Simpan Produk";
+            document.getElementById('btn-cancel').classList.add('hidden');
+        };
+    </script>
+</body>
+</html>
